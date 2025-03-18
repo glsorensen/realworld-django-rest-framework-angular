@@ -4,40 +4,45 @@
 		{
 			"parameters": {
 				"path": "pr-review",
-				"responseMode": "responseNode",
-				"options": {}
+				"responseMode": "lastNode",
+				"options": {},
+				"httpMethod": "POST"
 			},
 			"name": "Webhook",
 			"type": "n8n-nodes-base.webhook",
 			"typeVersion": 1,
-			"position": [250, 300]
+			"position": [240, 300]
 		},
 		{
 			"parameters": {
-				"resource": "completion",
-				"model": "gpt-4",
-				"prompt": "Review this pull request:\n\nTitle: {{$json.pull_request.title}}\nDescription: {{$json.pull_request.body}}\nChanged Files: {{$json.pull_request.changed_files}}\nAdditions: {{$json.pull_request.additions}}\nDeletions: {{$json.pull_request.deletions}}\n\nPlease provide a detailed code review with:\n1. Code quality assessment\n2. Security considerations\n3. Performance implications\n4. Suggested improvements\n5. Best practices recommendations\n\nFormat the response in markdown with clear sections and bullet points.",
-				"temperature": 0.7,
-				"maxTokens": 2000
+				"authentication": "apiKey",
+				"resource": "text",
+				"text": "You are an experienced code reviewer. Please provide a detailed code review for the following pull request:\n\nPull Request Title: {{$json.body.pull_request.title}}\nDescription: {{$json.body.pull_request.body}}\n\nProvide a thorough code review that includes:\n1. Code Quality Analysis\n2. Security Review\n3. Performance Considerations\n4. Specific Recommendations\n\nFormat your response in markdown with clear sections and bullet points. Be constructive and specific.",
+				"options": {
+					"model": "gpt-4",
+					"temperature": 0.2,
+					"maxTokens": 2000
+				},
+				"simplifyOutput": true
 			},
 			"name": "OpenAI",
 			"type": "n8n-nodes-base.openAi",
 			"typeVersion": 1,
-			"position": [450, 300]
+			"position": [400, 300]
 		},
 		{
 			"parameters": {
-				"resource": "review",
-				"owner": "{{$json.repository.owner}}",
-				"repository": "{{$json.repository.name}}",
-				"pullRequestNumber": "{{$json.pull_request.number}}",
-				"body": "{{$json.openAi.completion}}",
-				"event": "COMMENT"
+				"resource": "issue",
+				"operation": "createComment",
+				"owner": "glsorensen",
+				"repository": "realworld-django-rest-framework-angular",
+				"issueNumber": "1",
+				"body": "# AI Code Review\n\n{{$node[\"OpenAI\"].json}}"
 			},
 			"name": "GitHub",
 			"type": "n8n-nodes-base.github",
 			"typeVersion": 1,
-			"position": [650, 300]
+			"position": [560, 300]
 		}
 	],
 	"connections": {
@@ -66,7 +71,7 @@
 	},
 	"settings": {
 		"saveExecutionProgress": true,
-		"saveManualExecutions": false,
+		"saveManualExecutions": true,
 		"saveDataErrorExecution": "all",
 		"saveDataSuccessExecution": "all",
 		"executionTimeout": 3600,
