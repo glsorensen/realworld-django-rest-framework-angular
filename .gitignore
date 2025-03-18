@@ -5,6 +5,11 @@
 /node_modules
 /dist
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
 # IDEs and editors
 .idea
 .project
