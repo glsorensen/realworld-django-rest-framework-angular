@@ -1,0 +1,78 @@
+{
+	"name": "PR Review Workflow",
+	"nodes": [
+		{
+			"parameters": {
+				"path": "pr-review",
+				"responseMode": "responseNode",
+				"options": {}
+			},
+			"name": "Webhook",
+			"type": "n8n-nodes-base.webhook",
+			"typeVersion": 1,
+			"position": [250, 300]
+		},
+		{
+			"parameters": {
+				"resource": "completion",
+				"model": "gpt-4",
+				"prompt": "Review this pull request:\n\nTitle: {{$json.pull_request.title}}\nDescription: {{$json.pull_request.body}}\nChanged Files: {{$json.pull_request.changed_files}}\nAdditions: {{$json.pull_request.additions}}\nDeletions: {{$json.pull_request.deletions}}\n\nPlease provide a detailed code review with:\n1. Code quality assessment\n2. Security considerations\n3. Performance implications\n4. Suggested improvements\n5. Best practices recommendations\n\nFormat the response in markdown with clear sections and bullet points.",
+				"temperature": 0.7,
+				"maxTokens": 2000
+			},
+			"name": "OpenAI",
+			"type": "n8n-nodes-base.openAi",
+			"typeVersion": 1,
+			"position": [450, 300]
+		},
+		{
+			"parameters": {
+				"resource": "review",
+				"owner": "{{$json.repository.owner}}",
+				"repository": "{{$json.repository.name}}",
+				"pullRequestNumber": "{{$json.pull_request.number}}",
+				"body": "{{$json.openAi.completion}}",
+				"event": "COMMENT"
+			},
+			"name": "GitHub",
+			"type": "n8n-nodes-base.github",
+			"typeVersion": 1,
+			"position": [650, 300]
+		}
+	],
+	"connections": {
+		"Webhook": {
+			"main": [
+				[
+					{
+						"node": "OpenAI",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"OpenAI": {
+			"main": [
+				[
+					{
+						"node": "GitHub",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		}
+	},
+	"settings": {
+		"saveExecutionProgress": true,
+		"saveManualExecutions": false,
+		"saveDataErrorExecution": "all",
+		"saveDataSuccessExecution": "all",
+		"executionTimeout": 3600,
+		"timezone": "UTC"
+	},
+	"staticData": null,
+	"pinData": {},
+	"versionId": "1.0.0"
+}
