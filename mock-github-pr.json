@@ -1,0 +1,46 @@
+{
+	"body": {
+		"action": "opened",
+		"pull_request": {
+			"number": 123,
+			"title": "Add new feature implementation",
+			"body": "This PR implements the new feature we discussed in issue #42. It includes new API endpoints, data models, and tests.",
+			"files": [
+				{
+					"filename": "backend/api/views.py",
+					"status": "modified",
+					"additions": 45,
+					"deletions": 12,
+					"patch": "@@ -50,10 +50,15 @@ class ArticleViewSet(viewsets.ModelViewSet):\n     permission_classes = (IsAuthenticatedOrReadOnly,)\n     serializer_class = ArticleSerializer\n \n-    def get_queryset(self):\n+    def get_queryset(self):\n         queryset = Article.objects.all()\n         author = self.request.query_params.get('author', None)\n         tag = self.request.query_params.get('tag', None)\n+        favorited = self.request.query_params.get('favorited', None)\n+        \n+        if favorited is not None:\n+            queryset = queryset.filter(favorited_by__user__username=favorited)\n         \n         if author is not None:\n             queryset = queryset.filter(author__user__username=author)\n@@ -120,6 +125,34 @@ class ArticleViewSet(viewsets.ModelViewSet):\n         serializer = self.serializer_class(article, context=serializer_context)\n         return Response(serializer.data, status=status.HTTP_200_OK)\n \n+    @action(methods=['GET'], detail=False)\n+    def feed(self, request):\n+        \"\"\"Get articles from users the current user follows\"\"\"\n+        if not request.user.is_authenticated:\n+            raise exceptions.NotAuthenticated('Authentication required')\n+            \n+        user_profile = request.user.profile\n+        followed_users = user_profile.follows.all()\n+        queryset = Article.objects.filter(author__in=followed_users)\n+        \n+        page = self.paginate_queryset(queryset)\n+        serializer_context = {'request': request}\n+        serializer = self.serializer_class(\n+            page,\n+            context=serializer_context,\n+            many=True\n+        )\n+        \n+        return self.get_paginated_response(serializer.data)\n+"
+				},
+				{
+					"filename": "backend/api/models.py",
+					"status": "modified",
+					"additions": 28,
+					"deletions": 3,
+					"patch": "@@ -78,8 +78,16 @@ class Profile(TimestampedModel):\n     # A Profile can have many followers\n     follows = models.ManyToManyField(\n         'self',\n-        related_name='followed_by',\n-        symmetrical=False\n+        related_name='followed_by',\n+        symmetrical=False\n+    )\n+    \n+    # Users can favorite many Articles\n+    favorites = models.ManyToManyField(\n+        'articles.Article',\n+        related_name='favorited_by'\n     )\n     \n     def __str__(self):\n@@ -95,6 +103,23 @@ class Profile(TimestampedModel):\n     def is_following(self, profile):\n         \"\"\"Return True if we are following the given profile; False otherwise\"\"\"\n         return self.follows.filter(pk=profile.pk).exists()\n+        \n+    def favorite(self, article):\n+        \"\"\"Favorite an article if we haven't already favorited it\"\"\"\n+        self.favorites.add(article)\n+        \n+    def unfavorite(self, article):\n+        \"\"\"Unfavorite an article if we've already favorited it\"\"\"\n+        self.favorites.remove(article)\n+        \n+    def has_favorited(self, article):\n+        \"\"\"Return True if user has favorited the article; False otherwise\"\"\"\n+        return self.favorites.filter(pk=article.pk).exists()\n+"
+				},
+				{
+					"filename": "backend/api/tests.py",
+					"status": "modified",
+					"additions": 32,
+					"deletions": 0,
+					"patch": "@@ -250,3 +250,35 @@ class ArticleAPITestCase(APITestCase):\n         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)\n         articles = Article.objects.filter(title='How to train your dragon')\n         self.assertEqual(articles.count(), 1)\n+\n+    def test_favorite_article(self):\n+        \"\"\"Test favoriting an article\"\"\"\n+        # Create a new article\n+        url = reverse('articles-list')\n+        data = {'article': {'title': 'How to train your dragon', 'description': 'Ever wonder how?', 'body': 'You have to believe'}}\n+        self.client.credentials(HTTP_AUTHORIZATION='Token ' + self.user_token)\n+        response = self.client.post(url, data, format='json')\n+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)\n+        slug = response.data['slug']\n+        \n+        # Favorite the article\n+        url = reverse('articles-favorite', kwargs={'slug': slug})\n+        response = self.client.post(url)\n+        self.assertEqual(response.status_code, status.HTTP_200_OK)\n+        self.assertTrue(response.data['favorited'])\n+        \n+        # Make sure it shows as favorited when we get the article\n+        url = reverse('articles-detail', kwargs={'slug': slug})\n+        response = self.client.get(url)\n+        self.assertEqual(response.status_code, status.HTTP_200_OK)\n+        self.assertTrue(response.data['favorited'])\n+        \n+        # Unfavorite the article\n+        url = reverse('articles-unfavorite', kwargs={'slug': slug})\n+        response = self.client.delete(url)\n+        self.assertEqual(response.status_code, status.HTTP_200_OK)\n+        self.assertFalse(response.data['favorited'])"
+				},
+				{
+					"filename": "backend/api/urls.py",
+					"status": "modified",
+					"additions": 8,
+					"deletions": 2,
+					"patch": "@@ -15,13 +15,19 @@ router.register(r'articles', views.ArticleViewSet)\n \n urlpatterns = [\n     url(r'^', include(router.urls)),\n-    \n+\n     url(r'^articles/(?P<article_slug>[\\w-]+)/comments/?$', \n         views.CommentsListCreateAPIView.as_view()),\n \n     url(r'^articles/(?P<article_slug>[\\w-]+)/comments/(?P<comment_pk>[\\d]+)/?$',\n         views.CommentsDestroyAPIView.as_view()),\n     \n+    url(r'^articles/(?P<slug>[\\w-]+)/favorite/?$',\n+        views.ArticleViewSet.as_view({'post': 'favorite'}),\n+        name='articles-favorite'),\n+    \n+    url(r'^articles/(?P<slug>[\\w-]+)/unfavorite/?$',\n+        views.ArticleViewSet.as_view({'delete': 'unfavorite'}),\n+        name='articles-unfavorite'),\n+\n     url(r'^tags/?$', views.TagListAPIView.as_view()),\n ]"
+				}
+			]
+		},
+		"repository": {
+			"name": "realworld-django-rest-framework-angular",
+			"owner": {
+				"login": "your-username"
+			}
+		}
+	}
+}
