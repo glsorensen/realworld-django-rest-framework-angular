@@ -50,4 +50,32 @@ class ArticleAPITestCase(APITestCase):
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         articles = Article.objects.filter(title='How to train your dragon')
-        self.assertEqual(articles.count(), 1) 
+        self.assertEqual(articles.count(), 1)
+
+    def test_favorite_article(self):
+        """Test favoriting an article"""
+        # Create a new article
+        url = reverse('articles-list')
+        data = {'article': {'title': 'How to train your dragon', 'description': 'Ever wonder how?', 'body': 'You have to believe'}}
+        self.client.credentials(HTTP_AUTHORIZATION='Token ' + self.user_token)
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        slug = response.data['slug']
+        
+        # Favorite the article
+        url = reverse('articles-favorite', kwargs={'slug': slug})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['favorited'])
+        
+        # Make sure it shows as favorited when we get the article
+        url = reverse('articles-detail', kwargs={'slug': slug})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['favorited'])
+        
+        # Unfavorite the article
+        url = reverse('articles-unfavorite', kwargs={'slug': slug})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['favorited'])
