@@ -3,8 +3,66 @@
 		"action": "opened",
 		"pull_request": {
 			"number": 123,
+			"pull_request_id": 123,
+			"id": 123456789,
 			"title": "Add new feature implementation",
 			"body": "This PR implements the new feature we discussed in issue #42. It includes new API endpoints, data models, and tests.",
+			"html_url": "https://github.com/glsorensen/realworld-django-rest-framework-angular/pull/123",
+			"url": "https://api.github.com/repos/glsorensen/realworld-django-rest-framework-angular/pulls/123",
+			"_links": {
+				"self": {
+					"href": "https://api.github.com/repos/glsorensen/realworld-django-rest-framework-angular/pulls/123"
+				},
+				"html": {
+					"href": "https://github.com/glsorensen/realworld-django-rest-framework-angular/pull/123"
+				},
+				"issue": {
+					"href": "https://api.github.com/repos/glsorensen/realworld-django-rest-framework-angular/issues/123"
+				},
+				"comments": {
+					"href": "https://api.github.com/repos/glsorensen/realworld-django-rest-framework-angular/issues/123/comments"
+				},
+				"review_comments": {
+					"href": "https://api.github.com/repos/glsorensen/realworld-django-rest-framework-angular/pulls/123/comments"
+				},
+				"review_comment": {
+					"href": "https://api.github.com/repos/glsorensen/realworld-django-rest-framework-angular/pulls/comments{/number}"
+				},
+				"commits": {
+					"href": "https://api.github.com/repos/glsorensen/realworld-django-rest-framework-angular/pulls/123/commits"
+				},
+				"statuses": {
+					"href": "https://api.github.com/repos/glsorensen/realworld-django-rest-framework-angular/statuses/0123456789abcdef0123456789abcdef01234567"
+				}
+			},
+			"head": {
+				"ref": "feature-branch",
+				"sha": "0123456789abcdef0123456789abcdef01234567",
+				"repo": {
+					"id": 987654321,
+					"name": "realworld-django-rest-framework-angular",
+					"full_name": "glsorensen/realworld-django-rest-framework-angular",
+					"owner": {
+						"login": "glsorensen"
+					},
+					"html_url": "https://github.com/glsorensen/realworld-django-rest-framework-angular",
+					"clone_url": "https://github.com/glsorensen/realworld-django-rest-framework-angular.git"
+				}
+			},
+			"base": {
+				"ref": "main",
+				"sha": "fedcba9876543210fedcba9876543210fedcba98",
+				"repo": {
+					"id": 987654321,
+					"name": "realworld-django-rest-framework-angular",
+					"full_name": "glsorensen/realworld-django-rest-framework-angular",
+					"owner": {
+						"login": "glsorensen"
+					},
+					"html_url": "https://github.com/glsorensen/realworld-django-rest-framework-angular",
+					"clone_url": "https://github.com/glsorensen/realworld-django-rest-framework-angular.git"
+				}
+			},
 			"files": [
 				{
 					"filename": "backend/api/views.py",
@@ -38,8 +96,12 @@
 		},
 		"repository": {
 			"name": "realworld-django-rest-framework-angular",
+			"id": 987654321,
+			"full_name": "glsorensen/realworld-django-rest-framework-angular",
+			"html_url": "https://github.com/glsorensen/realworld-django-rest-framework-angular",
 			"owner": {
-				"login": "your-username"
+				"login": "glsorensen",
+				"id": 12345678
 			}
 		}
 	}
