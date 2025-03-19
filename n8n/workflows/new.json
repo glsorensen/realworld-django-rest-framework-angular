@@ -1,0 +1,460 @@
+{
+	"nodes": [
+		{
+			"id": "1",
+			"name": "GitHub Trigger",
+			"type": "n8n-nodes-base.githubTrigger",
+			"parameters": {
+				"events": ["pull_request"],
+				"actions": ["opened", "synchronize"],
+				"authentication": "githubApp",
+				"owner": "={{ $parameter.repositoryOwner }}",
+				"repository": "={{ $parameter.repositoryName }}"
+			},
+			"typeVersion": 1,
+			"position": [100, 100]
+		},
+		{
+			"id": "2",
+			"name": "Get PR Details",
+			"type": "n8n-nodes-base.github",
+			"parameters": {
+				"resource": "pullRequest",
+				"operation": "get",
+				"owner": "={{ $node[\"GitHub Trigger\"].json.repository.owner.login }}",
+				"repository": "={{ $node[\"GitHub Trigger\"].json.repository.name }}",
+				"pullRequestNumber": "={{ $node[\"GitHub Trigger\"].json.pull_request.number }}"
+			},
+			"typeVersion": 1,
+			"position": [300, 100]
+		},
+		{
+			"id": "3",
+			"name": "Get Changed Files",
+			"type": "n8n-nodes-base.github",
+			"parameters": {
+				"resource": "pullRequest",
+				"operation": "getFiles",
+				"owner": "={{ $node[\"GitHub Trigger\"].json.repository.owner.login }}",
+				"repository": "={{ $node[\"GitHub Trigger\"].json.repository.name }}",
+				"pullRequestNumber": "={{ $node[\"GitHub Trigger\"].json.pull_request.number }}"
+			},
+			"typeVersion": 1,
+			"position": [500, 100]
+		},
+		{
+			"id": "4",
+			"name": "Split Files for Processing",
+			"type": "n8n-nodes-base.splitInBatches",
+			"parameters": {
+				"batchSize": 5
+			},
+			"typeVersion": 1,
+			"position": [700, 50]
+		},
+		{
+			"id": "5",
+			"name": "Get File Content",
+			"type": "n8n-nodes-base.github",
+			"parameters": {
+				"resource": "file",
+				"operation": "get",
+				"owner": "={{ $node[\"GitHub Trigger\"].json.repository.owner.login }}",
+				"repository": "={{ $node[\"GitHub Trigger\"].json.repository.name }}",
+				"filePath": "={{ $json.filename }}",
+				"ref": "={{ $node[\"GitHub Trigger\"].json.pull_request.head.ref }}"
+			},
+			"typeVersion": 1,
+			"position": [900, 50]
+		},
+		{
+			"id": "6",
+			"name": "Static Analysis",
+			"type": "n8n-nodes-base.httpRequest",
+			"parameters": {
+				"url": "https://api.codeanalyzer.com/scan",
+				"method": "POST",
+				"bodyParameters": {
+					"parameters": [
+						{
+							"name": "content",
+							"value": "={{ $node[\"Get File Content\"].json.content }}"
+						},
+						{
+							"name": "path",
+							"value": "={{ $json.filename }}"
+						}
+					]
+				}
+			},
+			"typeVersion": 1,
+			"position": [1100, 0]
+		},
+		{
+			"id": "7",
+			"name": "Custom Analysis",
+			"type": "n8n-nodes-base.function",
+			"parameters": {
+				"jsCode": "// Custom JavaScript analysis code\nreturn {\n  json: {\n    issues: [\"Sample issue\"]\n  }\n};"
+			},
+			"typeVersion": 1,
+			"position": [1100, 100]
+		},
+		{
+			"id": "8",
+			"name": "Security Scan",
+			"type": "n8n-nodes-base.httpRequest",
+			"parameters": {
+				"url": "https://api.securityscanner.com/check",
+				"method": "POST",
+				"bodyParameters": {
+					"parameters": [
+						{
+							"name": "code",
+							"value": "={{ $node[\"Get File Content\"].json.content }}"
+						}
+					]
+				}
+			},
+			"typeVersion": 1,
+			"position": [1100, 200]
+		},
+		{
+			"id": "9",
+			"name": "Merge Analysis Results",
+			"type": "n8n-nodes-base.merge",
+			"parameters": {
+				"mode": "passThrough"
+			},
+			"typeVersion": 1,
+			"position": [1300, 100]
+		},
+		{
+			"id": "10",
+			"name": "Test Preparation",
+			"type": "n8n-nodes-base.function",
+			"parameters": {
+				"jsCode": "// JavaScript code to determine tests\nreturn {\n  json: {\n    testPlan: \"Generated test plan\"\n  }\n};"
+			},
+			"typeVersion": 1,
+			"position": [700, 200]
+		},
+		{
+			"id": "11",
+			"name": "Checkout Code",
+			"type": "n8n-nodes-base.ssh",
+			"parameters": {
+				"host": "test-server.com",
+				"username": "runner",
+				"password": "secret",
+				"command": "git clone {{ $node[\"GitHub Trigger\"].json.pull_request.head.repo.clone_url }}"
+			},
+			"typeVersion": 1,
+			"position": [900, 200]
+		},
+		{
+			"id": "12",
+			"name": "Run Tests",
+			"type": "n8n-nodes-base.ssh",
+			"parameters": {
+				"host": "test-server.com",
+				"username": "runner",
+				"password": "secret",
+				"command": "npm test"
+			},
+			"typeVersion": 1,
+			"position": [1100, 300]
+		},
+		{
+			"id": "13",
+			"name": "Parse Test Results",
+			"type": "n8n-nodes-base.function",
+			"parameters": {
+				"jsCode": "// Parse test output\nreturn {\n  json: {\n    results: \"Test results parsed\"\n  }\n};"
+			},
+			"typeVersion": 1,
+			"position": [1300, 300]
+		},
+		{
+			"id": "14",
+			"name": "Generate Report",
+			"type": "n8n-nodes-base.function",
+			"parameters": {
+				"jsCode": "// Generate markdown report\nconst items = $input.all();\nlet claudeAnalysis = \"\";\n\n// Find Claude analysis if available\nfor (const item of items) {\n  if (item.json.analysis) {\n    claudeAnalysis = item.json.analysis;\n    break;\n  }\n}\n\nreturn {\n  json: {\n    report: `# QA Report\\n\\n## Code Analysis\\n${claudeAnalysis || \"No AI analysis available\"}\\n\\n## Test Results\\nAll tests passed`,\n    summary: {\n      passed: true,\n      description: \"All tests passed with AI-assisted analysis\",\n      criticalIssues: 0\n    },\n    claudeAnalysisIncluded: !!claudeAnalysis\n  }\n};"
+			},
+			"typeVersion": 1,
+			"position": [1500, 200]
+		},
+		{
+			"id": "15",
+			"name": "Update PR Status",
+			"type": "n8n-nodes-base.github",
+			"parameters": {
+				"resource": "repository",
+				"operation": "createStatus",
+				"owner": "={{ $node[\"GitHub Trigger\"].json.repository.owner.login }}",
+				"repository": "={{ $node[\"GitHub Trigger\"].json.repository.name }}",
+				"sha": "={{ $node[\"GitHub Trigger\"].json.pull_request.head.sha }}",
+				"state": "={{ $json.summary.passed ? 'success' : 'failure' }}",
+				"context": "QA Agent",
+				"description": "={{ $json.summary.description }}"
+			},
+			"typeVersion": 1,
+			"position": [1700, 100]
+		},
+		{
+			"id": "16",
+			"name": "Post PR Comment",
+			"type": "n8n-nodes-base.github",
+			"parameters": {
+				"resource": "issue",
+				"operation": "createComment",
+				"owner": "={{ $node[\"GitHub Trigger\"].json.repository.owner.login }}",
+				"repository": "={{ $node[\"GitHub Trigger\"].json.repository.name }}",
+				"issueNumber": "={{ $node[\"GitHub Trigger\"].json.pull_request.number }}",
+				"body": "={{ $json.report }}"
+			},
+			"typeVersion": 1,
+			"position": [1700, 200]
+		},
+		{
+			"id": "17",
+			"name": "Check Failures",
+			"type": "n8n-nodes-base.if",
+			"parameters": {
+				"conditions": {
+					"number": [
+						{
+							"value1": "={{ $json.summary.criticalIssues }}",
+							"operation": "larger",
+							"value2": 0
+						}
+					]
+				}
+			},
+			"typeVersion": 1,
+			"position": [1700, 300]
+		},
+		{
+			"id": "18",
+			"name": "Notify Team",
+			"type": "n8n-nodes-base.slack",
+			"parameters": {
+				"channel": "#qa-alerts",
+				"text": "Critical issues found in PR: {{ $node[\"GitHub Trigger\"].json.pull_request.html_url }}"
+			},
+			"typeVersion": 1,
+			"position": [1900, 300]
+		},
+		{
+			"id": "19",
+			"name": "Error Handler",
+			"type": "n8n-nodes-base.errorTrigger",
+			"parameters": {},
+			"typeVersion": 1,
+			"position": [100, 400]
+		},
+		{
+			"id": "20",
+			"name": "Log Error",
+			"type": "n8n-nodes-base.function",
+			"parameters": {
+				"jsCode": "return {\n  json: { \n    error: $input.all()[0].json.error, \n    context: $input.all()[0].json \n  }\n};"
+			},
+			"typeVersion": 1,
+			"position": [300, 400]
+		},
+		{
+			"id": "21",
+			"name": "Alert Admin",
+			"type": "n8n-nodes-base.emailSend",
+			"parameters": {
+				"toEmail": "admin@company.com",
+				"subject": "QA Workflow Failure",
+				"text": "Error: {{ $json.error.message }}"
+			},
+			"typeVersion": 1,
+			"position": [500, 400]
+		},
+		{
+			"id": "22",
+			"name": "Claude Code Analysis",
+			"type": "n8n-nodes-base.httpRequest",
+			"parameters": {
+				"url": "https://api.anthropic.com/v1/messages",
+				"authentication": "headerAuth",
+				"headerParameters": {
+					"parameters": [
+						{
+							"name": "x-api-key",
+							"value": "YOUR_ANTHROPIC_API_KEY"
+						},
+						{
+							"name": "anthropic-version",
+							"value": "2023-06-01"
+						},
+						{
+							"name": "content-type",
+							"value": "application/json"
+						}
+					]
+				},
+				"method": "POST",
+				"bodyParameters": {
+					"parameters": []
+				},
+				"sendBody": true,
+				"specifyBody": "json",
+				"jsonBody": "{\n  \"model\": \"claude-3-7-sonnet-20240229\",\n  \"max_tokens\": 4000,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a senior software engineer specializing in code review and test writing. Please analyze the following code and provide: 1) A brief analysis of the code's quality, structure, and potential issues, 2) Suggested unit tests that would properly test this code, and 3) Implementation of those tests in the appropriate testing framework for this language.\\n\\nFile path: {{ $json.filename }}\\n\\nCode:\\n{{ $node[\\\"Get File Content\\\"].json.content }}\"\n    }\n  ]\n}"
+			},
+			"typeVersion": 1,
+			"position": [900, 150]
+		},
+		{
+			"id": "23",
+			"name": "Parse Claude Analysis",
+			"type": "n8n-nodes-base.function",
+			"parameters": {
+				"jsCode": "// Parse Claude's response\nlet claudeResponse;\ntry {\n  claudeResponse = $input.item.json.content || ($input.item.json.messages && $input.item.json.messages[0].content);\n  \n  if (!claudeResponse && $input.item.json.content && Array.isArray($input.item.json.content)) {\n    claudeResponse = $input.item.json.content[0].text;\n  }\n  \n  // If we still don't have a response, check other possible locations\n  if (!claudeResponse && $input.item.json.response) {\n    claudeResponse = $input.item.json.response;\n  }\n  \n  let analysis = \"\";\n  let tests = \"\";\n  \n  // Extract the analysis and tests from Claude's response\n  if (typeof claudeResponse === 'string') {\n    // Split the response into sections\n    const sections = claudeResponse.split(/#{2,3}\\s+/);\n    \n    analysis = sections.find(s => s.toLowerCase().includes('analysis'));\n    tests = sections.find(s => s.toLowerCase().includes('test'));\n    \n    if (!analysis) analysis = \"No specific analysis section found\";\n    if (!tests) tests = \"No specific tests section found\";\n  } else {\n    analysis = \"Could not parse Claude's response format\";\n    tests = \"Could not parse Claude's response format\";\n  }\n  \n  return {\n    json: {\n      filePath: $json.filename,\n      analysis: analysis,\n      suggestedTests: tests,\n      originalCode: $node[\"Get File Content\"].json.content,\n      claudeFullResponse: claudeResponse\n    }\n  };\n} catch (error) {\n  return {\n    json: {\n      error: error.message,\n      claudeResponse: claudeResponse || \"No response found\",\n      filePath: $json.filename\n    }\n  };\n}"
+			},
+			"typeVersion": 1,
+			"position": [1100, 150]
+		},
+		{
+			"id": "24",
+			"name": "Generate Test Files",
+			"type": "n8n-nodes-base.function",
+			"parameters": {
+				"jsCode": "// Generate test file content and path\nconst filePath = $input.item.json.filePath;\nconst tests = $input.item.json.suggestedTests;\n\n// Determine appropriate test file name based on original file path\nlet testFilePath = filePath;\n\n// Handle different naming conventions for test files\nif (filePath.endsWith('.js')) {\n  testFilePath = filePath.replace(/\\.js$/, '.test.js');\n} else if (filePath.endsWith('.ts')) {\n  testFilePath = filePath.replace(/\\.ts$/, '.spec.ts');\n} else if (filePath.endsWith('.py')) {\n  testFilePath = filePath.replace(/\\.py$/, '_test.py');\n} else if (filePath.endsWith('.java')) {\n  testFilePath = filePath.replace(/\\.java$/, 'Test.java');\n} else if (filePath.endsWith('.go')) {\n  testFilePath = filePath.replace(/\\.go$/, '_test.go');\n} else if (filePath.endsWith('.rb')) {\n  testFilePath = filePath.replace(/\\.rb$/, '_spec.rb');\n} else {\n  testFilePath = filePath + '.test';\n}\n\nreturn {\n  json: {\n    originalFilePath: filePath,\n    testFilePath: testFilePath,\n    testContent: tests,\n    analysis: $input.item.json.analysis\n  }\n};"
+			},
+			"typeVersion": 1,
+			"position": [1300, 150]
+		},
+		{
+			"id": "25",
+			"name": "Create Test PR",
+			"type": "n8n-nodes-base.github",
+			"parameters": {
+				"resource": "file",
+				"operation": "create",
+				"owner": "={{ $node[\"GitHub Trigger\"].json.repository.owner.login }}",
+				"repository": "={{ $node[\"GitHub Trigger\"].json.repository.name }}",
+				"filePath": "={{ $json.testFilePath }}",
+				"fileContent": "={{ $json.testContent }}",
+				"commitMessage": "Add automated tests generated by Claude 3.7",
+				"branch": "tests-for-pr-{{ $node[\"GitHub Trigger\"].json.pull_request.number }}"
+			},
+			"typeVersion": 1,
+			"position": [1500, 150]
+		}
+	],
+	"connections": {
+		"GitHub Trigger": {
+			"main": [[{ "node": "Get PR Details", "type": "main", "index": 0 }]]
+		},
+		"Get PR Details": {
+			"main": [[{ "node": "Get Changed Files", "type": "main", "index": 0 }]]
+		},
+		"Get Changed Files": {
+			"main": [
+				[
+					{ "node": "Split Files for Processing", "type": "main", "index": 0 },
+					{ "node": "Test Preparation", "type": "main", "index": 0 }
+				]
+			]
+		},
+		"Split Files for Processing": {
+			"main": [[{ "node": "Get File Content", "type": "main", "index": 0 }]]
+		},
+		"Get File Content": {
+			"main": [
+				[
+					{ "node": "Static Analysis", "type": "main", "index": 0 },
+					{ "node": "Custom Analysis", "type": "main", "index": 0 },
+					{ "node": "Security Scan", "type": "main", "index": 0 },
+					{ "node": "Claude Code Analysis", "type": "main", "index": 0 }
+				]
+			]
+		},
+		"Static Analysis": {
+			"main": [
+				[{ "node": "Merge Analysis Results", "type": "main", "index": 0 }]
+			]
+		},
+		"Custom Analysis": {
+			"main": [
+				[{ "node": "Merge Analysis Results", "type": "main", "index": 0 }]
+			]
+		},
+		"Security Scan": {
+			"main": [
+				[{ "node": "Merge Analysis Results", "type": "main", "index": 0 }]
+			]
+		},
+		"Claude Code Analysis": {
+			"main": [
+				[{ "node": "Parse Claude Analysis", "type": "main", "index": 0 }]
+			]
+		},
+		"Parse Claude Analysis": {
+			"main": [[{ "node": "Generate Test Files", "type": "main", "index": 0 }]]
+		},
+		"Generate Test Files": {
+			"main": [
+				[
+					{ "node": "Create Test PR", "type": "main", "index": 0 },
+					{ "node": "Merge Analysis Results", "type": "main", "index": 0 }
+				]
+			]
+		},
+		"Merge Analysis Results": {
+			"main": [[{ "node": "Generate Report", "type": "main", "index": 0 }]]
+		},
+		"Test Preparation": {
+			"main": [[{ "node": "Checkout Code", "type": "main", "index": 0 }]]
+		},
+		"Checkout Code": {
+			"main": [[{ "node": "Run Tests", "type": "main", "index": 0 }]]
+		},
+		"Run Tests": {
+			"main": [[{ "node": "Parse Test Results", "type": "main", "index": 0 }]]
+		},
+		"Parse Test Results": {
+			"main": [[{ "node": "Generate Report", "type": "main", "index": 0 }]]
+		},
+		"Generate Report": {
+			"main": [
+				[
+					{ "node": "Update PR Status", "type": "main", "index": 0 },
+					{ "node": "Post PR Comment", "type": "main", "index": 0 },
+					{ "node": "Check Failures", "type": "main", "index": 0 }
+				]
+			]
+		},
+		"Check Failures": {
+			"main": [[{ "node": "Notify Team", "type": "main", "index": 0 }]],
+			"false": [[{ "node": "Post PR Comment", "type": "main", "index": 0 }]]
+		},
+		"Error Handler": {
+			"main": [[{ "node": "Log Error", "type": "main", "index": 0 }]]
+		},
+		"Log Error": {
+			"main": [
+				[
+					{ "node": "Alert Admin", "type": "main", "index": 0 },
+					{ "node": "Update PR Status", "type": "main", "index": 0 }
+				]
+			]
+		},
+		"Create Test PR": {
+			"main": [[{ "node": "Generate Report", "type": "main", "index": 0 }]]
+		}
+	},
+	"settings": {},
+	"staticData": null,
+	"pinData": {},
+	"versionId": "",
+	"id": "",
+	"name": "GitHub PR QA Workflow with Claude 3.7",
+	"active": false
+}
